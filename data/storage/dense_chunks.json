@@ -1,0 +1,470 @@
+[
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p1_c000",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 1,
+    "chunk_index": 0,
+    "text": "SENIOR AI ENGINEER TECHNICAL ASSESSMENT — SAMPLE CORPUS  |  DOCUMENT 6 OF 6 Agentic AI FrameworksArchitecture, Orchestration Patterns, and Production Considerations LangChain LangGraph CrewAI AutoGen Amazon Bedrock Agents ReAct • Plan-Execute • Reflection • Supervisor 1. Introduction to Agentic AI Traditional LLM usage follows a prompt → response pattern: single query, single completion. Agentic AI replaces this with an autonomous loop: the agent plans actions, invokes external tools, observes results, revises reasoning, and iterates until a goal is achieved without per-step human guidance. Key properties: Autonomy (self-directed execution), Goal-Directed Behavior (maintains objective across steps), Tool Use (invokes APIs, databases, code interpreters), Memory (short-term conversation buffer + long-term external store), Reflection (self-critique and error correction), and Planning (decomposes goals into ordered subtasks). Dimension Simple Prompt-Response Agentic System Execution Single forward pass Iterative observe → think → act loop Tool access None / static retrieval Dynamic tool selection at runtime State Stateless Scratchpad + memory + intermediate results Latency 0.5–3s per call 5–120s per task (multi-call + I/O) Cost Fixed per query Variable; typically 3–30x a single call Cross-Reference — Docs 1 & 3 In RAG systems (Doc 1), retrieval is a fixed pipeline step. Agents treat vector database retrieval (Doc 3) as a dynamic tool — they can parameterize top_k, apply metadata filters, rewrite queries, and retry on failure. The vector DB becomes one tool among many in the agent’s reasoning loop. 2. LangChain LangChain Type: Open-source orchestration License: MIT Stars: ~95k Version: v0.3+ LangChain is the most widely adopted LLM framework (~700 integrations). Architecture is built on four primitives: Chains (sequential prompt → LLM → parser compositions), Agents (LLM-driven tool-selection loops via AgentExecutor ), Tools ( @tool - decorated functions exposing a name, description, and JSON schema to the LLM), and Memory (pluggable backends: buffer , summary, vector store, entity). LCEL (v0.2+) replaces legacy chains with pipe-composition syntax supporting native async, streaming, and batching: # LCEL RAG chain - pipe syntax: retriever | prompt | llm | parser rag_chain = ( {\"context\": vectorstore.as_retriever(k=5), \"question\": RunnablePassthrough()} | ChatPromptTemplate.from_template(ANSWER_TEMPLATE) | llm | StrOutputParser() ) # AgentExecutor with tools @tool def search_knowledge_base(query: str) -> str: # wraps vector DB (Doc 3)",
+    "token_count": 643,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 1,
+      "chunk_index": 0
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p1_c001",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 1,
+    "chunk_index": 1,
+    "text": "streaming, and batching: # LCEL RAG chain - pipe syntax: retriever | prompt | llm | parser rag_chain = ( {\"context\": vectorstore.as_retriever(k=5), \"question\": RunnablePassthrough()} | ChatPromptTemplate.from_template(ANSWER_TEMPLATE) | llm | StrOutputParser() ) # AgentExecutor with tools @tool def search_knowledge_base(query: str) -> str: # wraps vector DB (Doc 3) return \"\\n\".join([d.page_content for d in vectorstore.similarity_search(query, k=4)]) executor = AgentExecutor(agent=create_openai_tools_agent(llm, tools, prompt), tools=tools, max_iterations=10, handle_parsing_errors=True) ✔ Strengths 700+ integrations (LLMs, vector stores, APIs) Rapid prototyping; LCEL streaming/async built-in LangSmith native observability & eval Largest community and documentation ✘ Limitations Deep abstraction stacks — debugging non-trivial API churn: 3 major breaking migrations (v0.1→v0.3) AgentExecutor lacks graph-like flows; use LangGraph instead Python overhead measurable at high throughput Use when: Rapid prototyping; standard RAG pipelines; broad integration needs. For stateful/production agentic flows, prefer LangGraph. • • • • • • • • Agentic AI Frameworks — Document 6 of 6 Page 1 of 7",
+    "token_count": 298,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 1,
+      "chunk_index": 1
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p2_c002",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 2,
+    "chunk_index": 2,
+    "text": "3. LangGraph\nLangGraph\nType: Graph-based stateful orchestration (built on LangChain) License: MIT Stars: ~12k Version: v0.2+\nLangGraph replaces LangChain’s opaque AgentExecutor loop with an explicit directed graph where every routing decision is\ncode. Core concepts: Nodes (Python functions receiving/returning typed state), Edges (fixed or conditional transitions), State (a\nTypedDict passed through the graph with reducer-merged updates), and Checkpointing (persistent state snapshots in SQLite/\nPostgreSQL/Redis enabling resumability and human-in-the-loop breakpoints).\nclass AgentState(TypedDict):\nmessages: List[BaseMessage] # grows with each step\nfinal_answer: str # populated at END\ndef agent_node(state): return {\"messages\": [llm.invoke(state[\"messages\"])]}\ndef tool_node(state): return {\"messages\": execute_tools(state[\"messages\"][-1].tool_calls)}\ndef route(state) -> str: # conditional edge: call tools or end?\nreturn \"tools\" if state[\"messages\"][-1].tool_calls else END\napp = StateGraph(AgentState)\napp.add_node(\"agent\", agent_node); app.add_node(\"tools\", tool_node)\napp.set_entry_point(\"agent\")\napp.add_conditional_edges(\"agent\", route); app.add_edge(\"tools\", \"agent\")\napp = app.compile(checkpointer=SqliteSaver.from_conn_string(\"db.sqlite\"),\ninterrupt_before=[\"human_review\"])\n✔ Strengths\nExplicit state graph — every routing decision is\nauditable code\nNative cycles, parallel branches, sub-graphs\nCheckpointing enables HITL, resumability, time-travel\ndebugging\nLangGraph Platform provides managed deployment +\nStudio UI\n✘ Limitations\nSteeper learning curve; requires graph-design thinking\nupfront\nNewer ecosystem — fewer community examples vs.\nLangChain\nMore boilerplate than AgentExecutor for simple tasks\nInherits LangChain API churn\nUse when: Production agentic workflows; HITL gates; complex multi-step reasoning with cycles; long-running resumable tasks.\nPreferred over AgentExecutor for anything non-trivial.\n•\n•\n•\n•\n•\n•\n•\n•\nAgentic AI Frameworks — Document 6 of 6 Page 2 of 7",
+    "token_count": 499,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 2,
+      "chunk_index": 2
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p3_c003",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 3,
+    "chunk_index": 3,
+    "text": "4. CrewAI\nCrewAI\nType: Multi-agent role-based collaboration License: MIT Stars: ~28k Version: v0.80+\nCrewAI models workflows as a crew of role-specialized agents collaborating toward a shared goal. Each Agent has a role, goal,\nbackstory (LLM persona conditioning), tools, and an LLM assignment. Tasks define units of work with expected outputs. A Crew\norchestrates execution using either Process.sequential (fixed order; output of task N feeds N+1) or Process.hierarchical (a\nmanager LLM dynamically assigns tasks).\nresearcher = Agent(role=\"Senior AI Research Analyst\",\ngoal=\"Find accurate technical information\", backstory=\"...\",\ntools=[search_knowledge_base, web_search], llm=gpt4_llm)\nwriter = Agent(role=\"Technical Documentation Writer\",\ngoal=\"Transform findings into structured docs\", backstory=\"...\", llm=gpt4_llm)\ncrew = Crew(\nagents=[researcher, writer],\ntasks=[Task(description=\"Research LangGraph vs AutoGen\", agent=researcher),\nTask(description=\"Write technical summary\", agent=writer, context=[research_task])],\nprocess=Process.sequential\n)\nresult = crew.kickoff(inputs={\"topic\": \"agentic framework comparison\"})\n✔ Strengths\nIntuitive role-based design; maps to human team\nstructures\nMinimal boilerplate: 3–5 agents in 30–50 lines\nBuilt-in short-term, long-term, entity, and contextual\nmemory\nRole backstory effectively conditions agent\nspecialization\n✘ Limitations\nLess mature — fewer production deployments\nComplex conditional state management requires\nworkarounds\nSequential process cannot parallelize independent tasks\nnatively\nDebugging agent-to-agent delegation is challenging\nUse when: Tasks map to distinct expert roles; content generation pipelines; rapid multi-agent prototyping. Avoid for latency-critical\nflows or fine-grained state control requirements.\n•\n•\n•\n•\n•\n•\n•\n•\nAgentic AI Frameworks — Document 6 of 6 Page 3 of 7",
+    "token_count": 461,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 3,
+      "chunk_index": 3
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p4_c004",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 4,
+    "chunk_index": 4,
+    "text": "5. AutoGen (Microsoft)\nAutoGen — Microsoft Research\nType: Multi-agent conversation framework License: MIT Stars: ~38k Version: v0.4+ (AutoGen Core + AgentChat)\nAutoGen models agents as participants in conversational threads. The base ConversableAgent is subclassed into:\nAssistantAgent (LLM-backed; generates responses and code), UserProxyAgent (executes code in a Docker sandbox or solicits\nhuman input; human_input_mode : ALWAYS / TERMINATE / NEVER), and GroupChatManager (routes conversation turns among N\nagents using round-robin or LLM-driven speaker selection). First-class support for Docker-sandboxed code execution distinguishes\nAutoGen from other frameworks.\ncoder = autogen.AssistantAgent(\"Coder\", llm_config=cfg,\nsystem_message=\"Expert Python developer. Write clean, tested code.\")\nreviewer = autogen.AssistantAgent(\"Reviewer\", llm_config=cfg,\nsystem_message=\"Thorough code reviewer. Flag bugs and style issues.\")\nexecutor = autogen.UserProxyAgent(\"Executor\", human_input_mode=\"NEVER\",\ncode_execution_config={\"executor\": DockerCommandLineCodeExecutor(\nimage=\"python:3.11-slim\", timeout=60, work_dir=\"./workspace\")})\ngroupchat = autogen.GroupChat([coder, reviewer, executor], max_round=12,\nspeaker_selection_method=\"auto\")\nmanager = autogen.GroupChatManager(groupchat, llm_config=cfg)\nexecutor.initiate_chat(manager, message=\"Build a RAG pipeline using pgvector + FastAPI\")\n✔ Strengths\nResearch-grade flexibility; highly configurable agent\ntypes\nFirst-class Docker-sandboxed code generation +\nexecution\nAzure OpenAI / Azure AI Search native integration\nMulti-agent debate and consensus patterns built in\n✘ Limitations\nConversation-centric model unintuitive for non-chat\nworkflows\nv0.2 → v0.4 was a near-complete API rewrite\nConversation history grows unboundedly without\nmanagement\nResearch-focused — fewer production deployment\npatterns\nUse when: Code generation and debugging tasks; multi-agent debate/consensus; Microsoft Azure-centric deployments; research\nprototyping requiring high configurability.\n•\n•\n•\n•\n•\n•\n•\n•\nAgentic AI Frameworks — Document 6 of 6 Page 4 of 7",
+    "token_count": 520,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 4,
+      "chunk_index": 4
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p5_c005",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 5,
+    "chunk_index": 5,
+    "text": "6. Amazon Bedrock Agents Amazon Bedrock Agents Type: Fully managed agentic service (AWS) License: Proprietary GA: November 2023 Pricing: Per-token + per-session Bedrock Agents is a configuration-driven managed service — no orchestration code, just API calls and Lambda functions. Developers define Action Groups (tools as OpenAPI 3.0 schemas backed by Lambda), Knowledge Bases (managed RAG backed by Amazon OpenSearch Serverless or Aurora pgvector , with automatic Titan Embeddings ingestion — cross-refs Docs 1 & 3), Session Management (DynamoDB-backed state; 10-min default TTL, max 24h), and Guardrails (content filters, PII redaction, prompt injection detection, topic deny lists). import boto3 bedrock_agent = boto3.client(\"bedrock-agent\", region_name=\"us-east-1\") agent = bedrock_agent.create_agent( agentName=\"KnowledgeAssistant\", foundationModel=\"anthropic.claude-3-sonnet-20240229-v1:0\", instruction=\"Answer from the knowledge base. Cite sources when relevant.\", idleSessionTTLInSeconds=600 ) # Associate Knowledge Base (OpenSearch Serverless vector store) bedrock_agent.associate_agent_knowledge_base(agentId=AGENT_ID, knowledgeBaseId=KB_ID) # Invoke at runtime (streaming supported) response = boto3.client(\"bedrock-agent-runtime\").invoke_agent( agentId=AGENT_ID, agentAliasId=ALIAS_ID, sessionId=session_id, inputText=user_query ) ✔ Strengths Fully managed: no orchestration code, AWS handles scaling & HA Native AWS integration: S3, Lambda, DynamoDB, IAM, VPC, KMS Enterprise security: Guardrails, VPC endpoints, AWS Config compliance Managed RAG: end-to-end ingestion → embedding → retrieval SLA-backed; auto-scales from zero to high concurrency ✘ Limitations Vendor lock-in — tightly coupled to AWS; hard to migrate Limited orchestration flexibility vs. open-source Restricted to Bedrock-supported foundation models Cost unpredictability in agentic loops without token budgets Less granular debugging vs. LangSmith Use when: AWS-native enterprises prioritizing operational simplicity; regulated industries needing managed security/compliance; teams without deep MLOps expertise; managed RAG + guardrails more valuable than framework flexibility. 7. Head-to-Head Framework Comparison Matrix Dimension LangChain LangGraph CrewAI AutoGen Bedrock Agents Architecture Paradigm Chain / Agent loop Directed stateful graph Role-based crew Conversational agents Managed API service State Management Limited (buffer) Native typed state Per-agent memory Conversation history Managed (DynamoDB) Multi-Agent Support Via LangGraph Native sub-graphs Core feature Core feature Preview (2024)",
+    "token_count": 647,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 5,
+      "chunk_index": 5
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p5_c006",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 5,
+    "chunk_index": 6,
+    "text": "Dimension LangChain LangGraph CrewAI AutoGen Bedrock Agents Architecture Paradigm Chain / Agent loop Directed stateful graph Role-based crew Conversational agents Managed API service State Management Limited (buffer) Native typed state Per-agent memory Conversation history Managed (DynamoDB) Multi-Agent Support Via LangGraph Native sub-graphs Core feature Core feature Preview (2024) Tool Integration 700+ integrations All LangChain tools LangChain + custom Custom functions Lambda + OpenAPI Human-in-the-Loop Manual interrupt Native breakpoints Task-level flag human_input_mode Return-control action Checkpointing None native SQLite/Postgres/ Redis None native None native Managed DynamoDB Code Execution Via tool Via tool node Via tool Native Docker sandbox Lambda only Observability LangSmith (native) LangSmith + Studio Verbose logs only Custom logging CloudWatch + Trace Learning Curve Low Medium-High Low-Medium Medium Low (config-driven) Production Readiness Medium High Medium Medium (research) High (SLA-backed) Community Very large ~95k ★ Growing ~12k ★ Large ~28k ★ Large ~38k ★ AWS forums/docs Licensing MIT (open-source) MIT (open-source) MIT (open-source) MIT (open-source) AWS Commercial • • • • • • • • • • Agentic AI Frameworks — Document 6 of 6 Page 5 of 7",
+    "token_count": 319,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 5,
+      "chunk_index": 6
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p6_c007",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 6,
+    "chunk_index": 7,
+    "text": "Dimension LangChain LangGraph CrewAI AutoGen Bedrock Agents Cloud Dependency None (self-hosted) None (self-hosted) None (self-hosted) None (self-hosted) AWS required Typical Task Latency 10–45s 10–60s 15–90s 20–120s 8–30s (managed) Selection Heuristic for Knowledge Assistants For RAG-centric knowledge assistants: LangGraph (production-grade, explicit state, checkpointing + LangSmith tracing) or LangChain (rapid prototyping). Bedrock Agents for AWS-native with managed RAG. CrewAI for role-specialized multi-agent tasks. AutoGen for code-generation-heavy workflows. 8. Orchestration Patterns Pattern Mechanism Best For Key Trade-offs ReAct (Reasoning + Acting) Interleaves Thought → Action[tool] → Observation[result] in a loop until final answer . Grounds reasoning in external observations. General-purpose tool use; interpretable traces; any tool set + Interpretable trace; simple to implement. − Greedy; no backtracking; ~40–120 tokens overhead per step Plan-and- Execute Planner LLM call produces structured task list upfront; Executor agent works through steps; optional Replanner revises on failures. Complex multi-step tasks with knowable structure; cost-predictable workflows + Predictable execution; parallelizable steps. − Brittle if early steps fail; replanning adds 2–5s latency Reflection / Self-Critique After generation, a Critic agent (or same agent) evaluates output quality; critique fed back for N revision rounds or until quality threshold met. Code generation; writing tasks; factual accuracy improvement + +15–25% quality on benchmarks. − 2–3x token cost; can converge on local optima Multi-Agent Debate N agents independently generate solutions; structured debate rounds; Judge agent or majority vote selects winner . Reduces hallucination ~14% vs. single agent (Du et al., 2023). Factual verification; controversial or ambiguous decisions + Diverse perspectives reduce single-model blind spots. − 3–5x token cost; 30–120s per task Router / Dispatcher Lightweight classifier routes queries to specialized agents or tools (e.g., technical → code agent; HR → policy agent; math → calculator). Multi-domain systems; cost-tiered model routing; clear intent boundaries + Low latency; cost-efficient; maintainable. − Routing errors are silent; classifier adds ~200–500ms Supervisor Supervisor agent receives task, assigns sub-tasks to Worker agents, collects results, synthesizes final response. Workers do not communicate directly. Complex tasks with multiple specialized workers; parallel sub-task execution + Clean separation of concerns; workers can use smaller/cheaper models. − Single point of failure; 2– 3x more LLM calls",
+    "token_count": 662,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 6,
+      "chunk_index": 7
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p6_c008",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 6,
+    "chunk_index": 8,
+    "text": "silent; classifier adds ~200–500ms Supervisor Supervisor agent receives task, assigns sub-tasks to Worker agents, collects results, synthesizes final response. Workers do not communicate directly. Complex tasks with multiple specialized workers; parallel sub-task execution + Clean separation of concerns; workers can use smaller/cheaper models. − Single point of failure; 2– 3x more LLM calls 9. Tool Use and Function Calling Tool use is the mechanism by which agents interact with the external world. Modern LLMs expose a function calling API (OpenAI) or tool use API (Anthropic) that returns structured JSON specifying which tool to call and with what arguments — the framework then executes the function and feeds the result back as the next message. The LLM never executes tools directly; it only outputs structured invocation requests. # Tool schema (OpenAI convention) - precision in description drives LLM selection accuracy TOOL_SCHEMA = {\"name\": \"search_vector_database\", \"description\": \"Search internal knowledge base via semantic similarity. \" \"Use when query requires specific facts from internal documents.\", \"parameters\": {\"type\": \"object\", \"properties\": { \"query\": {\"type\": \"string\", \"description\": \"Query rephrased for semantic retrieval\"}, \"top_k\": {\"type\": \"integer\", \"default\": 5, \"description\": \"Number of results (1-20)\"}, \"filter\": {\"type\": \"object\", \"description\": \"Optional metadata filter, e.g. {doc_id: 3}\"}}, \"required\": [\"query\"]}} # Structured error handling wrapper def execute_tool_safely(name, args): try: return ToolResult(success=True, content=str(tool_registry[name](**args))) except ArgumentError as e: return ToolResult(success=False, content=f\"ArgumentError: {e}. Check required params.\") except TimeoutError: return ToolResult(success=False, content=\"Tool timed out (30s). Try a simpler query.\") Best Practice Implementation Impact Precise descriptions Define when to use a tool, not just what it does +20–35% tool selection accuracy Minimal required fields Mark only truly mandatory params as required; use defaults ~40% fewer JSON parse errors and agent retries Agentic AI Frameworks — Document 6 of 6 Page 6 of 7",
+    "token_count": 538,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 6,
+      "chunk_index": 8
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p7_c009",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 7,
+    "chunk_index": 9,
+    "text": "Best Practice Implementation Impact Narrow scope (atomic tools) One tool per capability; avoid multi-function tools Reduces ambiguity; LLMs struggle to select sub-functions Idempotent read tools Safe to retry; write tools must be idempotent Prevents duplicate side effects on agent retries Encapsulate RAG complexity Wrap full retrieval pipeline (query transform + hybrid search + rerank) as single tool (Docs 1 & 3) Agent only passes natural language query; no retrieval mechanics exposed 10. Production Considerations 10.1 Monitoring & Observability Tool Framework Support Key Capabilities Cost LangSmith LangChain, LangGraph (native) Full trace trees, token counts per step, latency breakdown, regression datasets, prompt versioning, human feedback Free 5k traces/mo; $39/mo Developer Arize Phoenix Framework-agnostic (OpenTelemetry) Trace visualization, span-level evals, embedding drift detection Open-source self-hosted or cloud free tier AWS CloudWatch + X-Ray Bedrock Agents (native) Agent trace view, Lambda logs, cost attribution per session Standard CloudWatch pricing; ~$0.05/trace X-Ray 10.2 Cost Management Agentic loops can consume 10–50x more tokens than simple QA. Key controls: (1) Max iterations — always set max_iterations / max_round (production default: 10–15); uncapped agents loop indefinitely on ambiguous tasks. (2) Model tiering — GPT-4o-mini/ Claude Haiku for routing and tool selection; GPT-4o/Claude Sonnet for final synthesis; 60–75% cost reduction with minimal quality impact. (3) Prompt caching — Anthropic Extended Cache and OpenAI automatic caching reduce repeated-context cost by 50–90%. (4) Token budget tracking — alert at 80% context window; apply sliding window or summarization beyond threshold. 10.3 Security Considerations Sandboxed code execution — Always isolate in Docker (read-only filesystem, no network, resource limits: 512MB RAM, 2 CPU, 60s). Never execute agent-generated code on the host process. Prompt injection via tool outputs — Tool results (web search, user files, DB content) may contain adversarial instructions. Mitigations: prefix with \"Tool Result [untrusted]:\", apply a classifier to scan before injecting into context, limit output length to prevent context flooding. Credential management — Never pass API keys in LLM-visible parameters. Use environment variables, AWS Secrets Manager , or Vault. Agents access secrets through the execution environment only. PII accumulation — Conversation state may accumulate PII across turns. Apply scrubbing before logging; use Bedrock Guardrails PII redaction or LangSmith field masking for managed deployments.",
+    "token_count": 654,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 7,
+      "chunk_index": 9
+    }
+  },
+  {
+    "chunk_id": "agentic_ai_frameworks_pdf_p7_c010",
+    "document_name": "agentic_ai_frameworks.pdf",
+    "page_number": 7,
+    "chunk_index": 10,
+    "text": "Credential management — Never pass API keys in LLM-visible parameters. Use environment variables, AWS Secrets Manager , or Vault. Agents access secrets through the execution environment only. PII accumulation — Conversation state may accumulate PII across turns. Apply scrubbing before logging; use Bedrock Guardrails PII redaction or LangSmith field masking for managed deployments. 10.4 Testing & Latency Optimization Test Layer Scope Tools / Methods Target Unit Tests Individual tools, prompt templates, output parsers pytest + mock LLM responses (fixed JSON) 100% branch coverage on all tools Integration Tests Full agent run on known inputs; verify tool call sequence LangSmith eval datasets; VCR cassettes for tool calls 20–30 canonical test cases LLM-as-Judge Eval Answer quality, faithfulness, tool selection correctness RAGAS (Doc 1); LangSmith evaluators; G-Eval Faithfulness ≥0.85; answer relevance ≥0.80 Adversarial Tests Prompt injection; max-iteration triggers; unanswerable Qs Red-team test suite; fuzzing tool inputs All known attack vectors covered Latency optimization: Enable token-level streaming (LCEL astream ; Bedrock streaming) to reduce time-to-first-token from ~10s to <1s. Execute independent tool calls in parallel (LangGraph parallel nodes; target <500ms per tool in critical path). Pre-load tool schemas and vector DB connections at startup; avoid per-request initialization. For high-volume deployments, use Bedrock Agents provisioned throughput or LangGraph Platform to eliminate cold-start latency. Document 6 of 6 — Agentic AI Frameworks | Senior AI Engineer Technical Assessment Sample Corpus. Cross-references: Doc 1 (RAG Architecture Patterns), Doc 3 (Vector Database Comparison). Questions about frameworks not covered here (Haystack Agents, Semantic Kernel, Flowise) or specific benchmark datasets not present in this document should be handled as unanswerable by the Knowledge Assistant. • • • • Agentic AI Frameworks — Document 6 of 6 Page 7 of 7",
+    "token_count": 496,
+    "metadata": {
+      "source": "agentic_ai_frameworks.pdf",
+      "page": 7,
+      "chunk_index": 10
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p1_c000",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 1,
+    "chunk_index": 0,
+    "text": "SENIOR AI ENGINEER ASSESSMENT — CORPUS DOCUMENT\nRAG Architecture\nPatterns\nA Comprehensive Technical Reference for Production Systems\nThis reference covers retrieval-augmented generation (RAG) from first principles through\nadvanced production patterns — including chunking strategies, embedding models, retrieval\nmethods, pipeline architecture, evaluation frameworks, and operational best practices.\nDOCUMENT TYPE\nTechnical Reference\nSCOPE\nProduction RAG Systems\nVERSION\n2025 Edition",
+    "token_count": 120,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 1,
+      "chunk_index": 0
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p2_c001",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 2,
+    "chunk_index": 1,
+    "text": "Table of Contents\n1 Introduction to RAG and the Retrieve-Then-Generate Paradigm 3\n2 Document Chunking Strategies 3\n3 Embedding Models 4\n4 Retrieval Methods 5\n5 Advanced RAG Patterns 6\n6 RAG Pipeline Architecture 7\n7 Evaluation Metrics and Frameworks 8\n8 Common Pitfalls and Best Practices 9\nRAG Architecture Patterns — Technical Reference Page 2 of 10",
+    "token_count": 87,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 2,
+      "chunk_index": 1
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p3_c002",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 3,
+    "chunk_index": 2,
+    "text": "1   Introduction to RAG and the Retrieve-Then-Generate Paradigm Retrieval-Augmented Generation (RAG) grounds large language model (LLM) outputs in verifiable, up-to-date external knowledge, dramatically reducing hallucination rates and enabling domain-specific applications without full fine-tuning. 1.1 What Is RAG? RAG is an architectural pattern that augments an LLM's parametric knowledge with non-parametric, retrieved context at inference time. First formalised by Lewis et al. (2020, Facebook AI Research), the core idea is simple: before generating a response, retrieve the k most relevant documents from an external corpus and inject them into the model's context window. This addresses two fundamental limitations of standalone LLMs: (1) knowledge cutoff — models cannot access information published after training; (2) hallucination — models sometimes generate confident but factually incorrect outputs when relying solely on parametric memory. 1.2 The Retrieve-Then-Generate Paradigm The canonical RAG pipeline consists of three stages executed at query time: Retrieval: Given a user query q, compute a similarity score between an embedded representation of q and all document chunk embeddings in a vector store. Return the top-k chunks (typically k = 3–10). Augmentation: Construct a prompt that includes the retrieved context chunks alongside the original query, using a structured template (e.g., Context: {docs} \\n\\n Question: {q} \\n Answer:). Generation: Pass the augmented prompt to the LLM, which synthesises an answer grounded in the provided context. 1.3 RAG vs. Fine-Tuning Dimension RAG Fine-Tuning Knowledge update Re-index corpus (minutes–hours) Full retraining (days–weeks) Traceability High — source chunks cited Low — knowledge opaque Cost (ongoing) Retrieval latency + storage Retraining compute Hallucination risk Low (grounded in context) Moderate Domain adaptation Corpus-driven Data-driven Industry Benchmark: RAG reduces hallucination rates by 40–60% compared to vanilla LLM generation on knowledge-intensive QA tasks (Gao et al., 2023). On TriviaQA, RAG with DPR achieves 56.8% exact match vs. GPT-3's 29.9% zero-shot baseline. 1.4 Naive vs. Advanced RAG Naive RAG applies fixed-size chunking, a single dense retriever , and direct stuffing of top-k chunks into the prompt. While functional, it suffers from retrieval precision issues, context window misuse, and sensitivity to chunk quality. Advanced RAG introduces query transformation, hybrid retrieval, re-ranking, contextual compression, and structured pipeline orchestration to address these gaps. 2   Document Chunking Strategies",
+    "token_count": 655,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 3,
+      "chunk_index": 2
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p3_c003",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 3,
+    "chunk_index": 3,
+    "text": "While functional, it suffers from retrieval precision issues, context window misuse, and sensitivity to chunk quality. Advanced RAG introduces query transformation, hybrid retrieval, re-ranking, contextual compression, and structured pipeline orchestration to address these gaps. 2   Document Chunking Strategies Chunking is the most impactful — and most under-appreciated — parameter in RAG system design. The chunk is the atomic unit of retrieval; its size and boundaries determine what context the model sees. 2.1 Fixed-Size Chunking Split documents into chunks of exactly N characters (or tokens), with an optional overlap of O characters to preserve context across boundaries. ✓ PROS Deterministic and fast — O(n) time Predictable embedding sizes Easy to implement and reason about ✗ CONS Splits mid-sentence or mid-concept Ignores semantic structure entirely Requires careful overlap tuning Recommended sizes: 256–512 tokens for dense QA tasks; 512–1024 tokens for document summarisation. Overlap: 10–15% of chunk size (e.g., 50 tokens for 512-token chunks). Benchmark studies show 512-token chunks with 50- token overlap maximise retrieval recall on most English corpora. 2.2 Sentence-Based Chunking Use a sentence boundary detector (e.g., SpaCy, NLTK Punkt) to split text at natural sentence endings, then group consecutive sentences into chunks up to a maximum token budget. 1. 2. 3. • • • • • • RAG Architecture Patterns — Technical Reference Page 3 of 10",
+    "token_count": 366,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 3,
+      "chunk_index": 3
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p4_c004",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 4,
+    "chunk_index": 4,
+    "text": "✓ PROS Preserves grammatical completeness Better semantic coherence per chunk Suitable for factoid retrieval ✗ CONS Variable chunk sizes complicate batching Sentence detector errors propagate Misses multi-sentence concepts Recommended sizes: 3–7 sentences per chunk; target ≤ 384 tokens. Particularly effective for legal and scientific corpora where sentence-level precision matters. 2.3 Semantic Chunking Embed every sentence independently, then compute cosine similarity between adjacent sentence embeddings. Insert a chunk boundary wherever similarity drops below a threshold (typically 0.7–0.8), signalling a topic transition. ✓ PROS Chunks align with topical units Highest semantic coherence Improves retrieval precision by ~12% ✗ CONS Expensive — requires N sentence embeddings Threshold requires domain calibration Inconsistent chunk sizes Recommended approach: Use text-embedding-3-small for sentence embeddings during indexing. Set threshold at 0.75. Merge chunks smaller than 128 tokens with the adjacent chunk. 2.4 Recursive Character Text Splitting LangChain's RecursiveCharacterTextSplitter uses a priority-ordered list of separators — [\"\\n\\n\", \"\\n\", \". \", \" \", \"\"] — attempting larger structural splits first, recursively falling back to finer-grained splits only when necessary. ✓ PROS Respects paragraph and sentence structure by default More robust than naive fixed-size Configurable separator hierarchy ✗ CONS Still character-based, not semantic Markdown/code requires custom separators No awareness of document structure Recommended configuration: chunk_size=512, chunk_overlap=64. For Markdown, add [\"## \", \"### \", \"\\n\\n\"] as leading separators. This is the recommended default for general-purpose RAG. 2.5 Chunking Strategy Comparison Strategy Retrieval Precision Index Speed Chunk Consistency Best For Fixed-size Moderate Very fast High Rapid prototyping Sentence-based Good Fast Moderate Factoid QA Semantic High (+12%) Slow (2–5×) Low Long-form docs Recursive char Good Fast Moderate General purpose 3   Embedding Models The embedding model maps both queries and document chunks to a shared vector space. Model selection determines the quality ceiling of retrieval — no amount of downstream re-ranking can recover from a weak embedding space. 3.1 OpenAI text-embedding-ada-002 and text-embedding-3 Series OpenAI's embedding API remains the most widely deployed option in production RAG systems. text-embedding-ada-002: 1536-dimensional vectors; 8191-token context window; cost: $0.0001 / 1K tokens. Strong MTEB score of 61.0. The safe default for most production systems through 2024.",
+    "token_count": 652,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 4,
+      "chunk_index": 4
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p4_c005",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 4,
+    "chunk_index": 5,
+    "text": "embedding space. 3.1 OpenAI text-embedding-ada-002 and text-embedding-3 Series OpenAI's embedding API remains the most widely deployed option in production RAG systems. text-embedding-ada-002: 1536-dimensional vectors; 8191-token context window; cost: $0.0001 / 1K tokens. Strong MTEB score of 61.0. The safe default for most production systems through 2024. text-embedding-3-small: 1536 dimensions (reducible via MRL to 512 or 256); MTEB score 62.3; cost: $0.00002 / 1K tokens — 5× cheaper than ada-002 with higher accuracy. text-embedding-3-large: 3072 dimensions; MTEB score 64.6; cost: $0.00013 / 1K tokens. Recommended for high-precision retrieval tasks. Matryoshka Representation Learning (MRL): text-embedding-3 models support dimension truncation without retraining. Truncating from 1536 → 256 dimensions reduces storage by 83% with only a 3–5% precision drop, enabling cost-effective large-scale deployments. 3.2 Cohere Embed Cohere's embedding models offer a compelling open-weights alternative: embed-english-v3.0: 1024 dimensions; int8 quantisation supported natively; 512-token context; MTEB score 64.5. Supports binary embeddings (1-bit quantisation) for ultra-fast approximate search at ~97% recall. embed-multilingual-v3.0: 108 languages; 1024 dimensions; MTEB Multilingual score 62.4. • • • • • • • • • • • • • • • • • • • • • • • RAG Architecture Patterns — Technical Reference Page 4 of 10",
+    "token_count": 352,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 4,
+      "chunk_index": 5
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p5_c006",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 5,
+    "chunk_index": 6,
+    "text": "Key differentiator: Cohere's API accepts both search_document and search_query input types, applying asymmetric embeddings that improve retrieval recall by 5–8% over symmetric embeddings for short-query / long-document retrieval scenarios. 3.3 Sentence-Transformers (Open-Source) The sentence-transformers library provides 100+ pre-trained models suitable for self-hosted, privacy-sensitive, or cost-constrained deployments: all-mpnet-base-v2: 768 dimensions; highest quality for English; MTEB score 57.8; 420 MB model size. all-MiniLM-L6-v2: 384 dimensions; excellent speed/quality tradeoff; 5× faster than mpnet; MTEB score 56.3; 80 MB. Ideal for low-latency requirements. bge-large-en-v1.5 (BAAI): 1024 dimensions; MTEB score 63.6; surpasses ada-002 on English benchmarks at zero API cost. e5-large-v2 (Microsoft): 1024 dimensions; MTEB 62.3; prepend \"query: \" and \"passage: \" prefixes for best results. 3.4 Dimensionality and Storage Considerations Model Dimensions MTEB Score Cost / 1M tokens Storage (1M vectors) text-embedding-3-small 1536 62.3 $0.02 ~6 GB (float32) text-embedding-3-large 3072 64.6 $0.13 ~12 GB (float32) cohere embed-v3 1024 64.5 $0.10 ~4 GB (float32) bge-large-en-v1.5 1024 63.6 $0 (self-host) ~4 GB (float32) all-MiniLM-L6-v2 384 56.3 $0 (self-host) ~1.5 GB (float32) Storage calculated as: dimensions × 4 bytes × num_vectors. int8 quantisation reduces storage by 4×. Binary embeddings reduce by 32×. 3.5 Embedding Best Practices Use the same model for indexing and query time — cross-model vector spaces are incompatible. Normalise embeddings to unit length before storing; inner product then equals cosine similarity, enabling faster SIMD operations. Batch encode during indexing: most APIs accept batches of 512–2048 texts; this reduces latency by 10–20× vs. individual requests. Cache query embeddings for repeated queries; embed queries asynchronously in high-throughput systems. 4   Retrieval Methods No single retrieval strategy dominates across all domains. Production systems typically combine dense and sparse retrieval with downstream re-ranking to balance recall, precision, and latency. 4.1 Dense Retrieval (ANN Search) Dense retrieval uses approximate nearest neighbour (ANN) search over the embedding vector space. Query and document embeddings are compared using cosine similarity or inner product. HNSW (Hierarchical Navigable Small World): De-facto standard; O(log N) query time; 95–99% recall@10 at 1ms latency for 1M vectors. Implemented in FAISS, Qdrant, Weaviate, Chroma. IVF-PQ (Inverted File + Product Quantisation): Memory-efficient for billion-scale; 64–256 bytes per vector vs.",
+    "token_count": 658,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 5,
+      "chunk_index": 6
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p5_c007",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 5,
+    "chunk_index": 7,
+    "text": "document embeddings are compared using cosine similarity or inner product. HNSW (Hierarchical Navigable Small World): De-facto standard; O(log N) query time; 95–99% recall@10 at 1ms latency for 1M vectors. Implemented in FAISS, Qdrant, Weaviate, Chroma. IVF-PQ (Inverted File + Product Quantisation): Memory-efficient for billion-scale; 64–256 bytes per vector vs. 4KB for float32 1024-dim vectors. Flat (brute-force): 100% recall; practical only for <100K vectors; O(N) per query. FAISS benchmark (1M 128-dim vectors, HNSW M=32): 0.8ms query latency, 97.3% recall@10, 512 MB RAM. Builds in ~45 seconds. 4.2 Sparse Retrieval — BM25 BM25 (Best Match 25) is a probabilistic bag-of-words ranking function that scores document relevance based on term frequency (TF), inverse document frequency (IDF), and document length normalisation: Score(D,Q) = Σ IDF(qᵢ) · [TF(qᵢ,D) · (k₁+1)] / [TF(qᵢ,D) + k₁ · (1 - b + b · |D|/avgdl)] Where k₁ = 1.5 controls TF saturation and b = 0.75 controls length normalisation. BM25 excels at exact-match keyword queries and technical terminology not well-represented in embedding spaces (model names, product codes, acronyms). Implementation: Elasticsearch, OpenSearch, BM25Okapi (Python), Whoosh. Elasticsearch achieves <10ms latency on 10M documents at 99th percentile. 4.3 Hybrid Search Hybrid search combines dense and sparse scores via Reciprocal Rank Fusion (RRF) or weighted linear combination: • • • • • • • • • • • RAG Architecture Patterns — Technical Reference Page 5 of 10",
+    "token_count": 377,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 5,
+      "chunk_index": 7
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p6_c008",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 6,
+    "chunk_index": 8,
+    "text": "RRF_score(d) = Σ 1 / (k + rank_i(d)) where k = 60 (empirically optimal) Linear: score(d) = α · dense_score(d) + (1 - α) · sparse_score(d) α ∈ [0, 1] RRF is preferred when scores are not on the same scale. A typical starting value for linear fusion is α = 0.7 (dense- heavy). In benchmarks on MS MARCO, hybrid search improves NDCG@10 by +8–14% over dense-only retrieval. Method Recall@10 Precision@5 Latency (1M docs) Exact-match strength Dense only (HNSW) 78–85% 62–70% 1–3ms Low BM25 only 65–74% 55–65% 5–10ms High Hybrid (RRF) 84–91% 68–76% 8–15ms High 4.4 Re-Ranking with Cross-Encoders Bi-encoder retrieval (dense/sparse) is fast but imprecise — it scores query-document pairs independently. Cross- encoders see both query and document jointly, enabling deep attention-based relevance scoring at the cost of O(N) forward passes. Workflow: Retrieve top-100 candidates via fast ANN/BM25, then re-rank with a cross-encoder to produce a refined top-10. Common models: cross-encoder/ms-marco-MiniLM-L-6-v2: 22M params; 40ms for 100 pairs; NDCG@10 improvement: +6–12% over bi-encoder retrieval. cohere rerank-english-v3.0: API-based; state-of-the-art BEIR scores; latency ~200ms per request (network- dependent). BAAI/bge-reranker-large: 335M params; best open-source option; BEIR NDCG@10 of 54.2. 4.5 Maximal Marginal Relevance (MMR) MMR balances relevance and diversity in the retrieved set, preventing near-duplicate chunks from dominating the context window: MMR = argmax_d [λ · sim(q, d) - (1-λ) · max_{d' ∈ S} sim(d, d')] Where S is the set of already-selected documents, λ controls the relevance/diversity tradeoff (λ = 0.5 is a common default). MMR is particularly valuable for multi-faceted queries where diverse perspectives improve answer quality. 5   Advanced RAG Patterns Advanced patterns address the failure modes of naive RAG: poor retrieval for ambiguous or complex queries, context window misuse, and answer unfaithfulness. 5.1 Query Transformation The user's original query is often poorly suited for retrieval — it may be too short, ambiguous, or presuppose knowledge. Query transformation rewrites the query before retrieval. Step-Back Prompting: Ask the LLM to generate a more abstract, principle-level question. E.g., \"What GPU is in the RTX 4090?\" → \"What are NVIDIA's current-generation GPU architectures?\" Improves retrieval by 15% on knowledge-intensive tasks. Query Decomposition: Break complex multi-hop questions into sub-queries. Execute each sub-query independently and merge retrieved contexts before generation.",
+    "token_count": 635,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 6,
+      "chunk_index": 8
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p6_c009",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 6,
+    "chunk_index": 9,
+    "text": "Step-Back Prompting: Ask the LLM to generate a more abstract, principle-level question. E.g., \"What GPU is in the RTX 4090?\" → \"What are NVIDIA's current-generation GPU architectures?\" Improves retrieval by 15% on knowledge-intensive tasks. Query Decomposition: Break complex multi-hop questions into sub-queries. Execute each sub-query independently and merge retrieved contexts before generation. Query Expansion: Append synonyms, related terms, or alternative phrasings using an LLM or lexical resource (WordNet) before embedding. 5.2 HyDE — Hypothetical Document Embeddings HyDE (Gao et al., 2022) inverts the retrieval problem: instead of embedding the short query and searching for similar long documents, use an LLM to generate a hypothetical answer document, then embed that document for retrieval. q_hypothetical = LLM(\"Write a passage that answers: \" + q) retrieved_docs = ANN_search(embed(q_hypothetical), corpus) Mechanism: The hypothetical document occupies the same part of the embedding space as real answer- containing documents, narrowing the distribution mismatch between short queries and long passages. Performance: +12–18% NDCG@10 over baseline dense retrieval on TREC DL19/DL20 benchmarks. Caution: If the LLM hallucinates in the hypothetical, retrieval quality degrades. Apply only when a capable LLM (GPT-4 class) is available for hypothesis generation. 5.3 Multi-Query Retrieval Generate N diverse query reformulations using an LLM (N = 3–5 is typical), retrieve top- k chunks for each, then deduplicate and union the result sets before re-ranking. Increases recall by 20–30% for ambiguous queries by covering multiple interpretations. • • • • • • • • • • RAG Architecture Patterns — Technical Reference Page 6 of 10",
+    "token_count": 435,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 6,
+      "chunk_index": 9
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p7_c010",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 7,
+    "chunk_index": 10,
+    "text": "Latency cost: N × retrieval latency (parallelisable). Deduplication via chunk ID set union; re-rank the merged ~(N·k) candidates using a cross-encoder . 5.4 Parent-Child Chunking Index small child chunks (128–256 tokens) for high-precision retrieval, but return their larger parent chunks (512– 2048 tokens) for richer generation context. Indexing: Store parent chunks in a document store; index child chunks in the vector store with a parent_id pointer . Retrieval: Retrieve top-k child chunks, look up their parent chunks, deduplicate, and pass parents to the LLM. Benefit: Child chunk precision combined with parent chunk context. Particularly effective for long legal/scientific documents where a single sentence answers the query but the surrounding paragraph provides necessary context. LangChain implementation: ParentDocumentRetriever with InMemoryStore for the parent docstore. 5.5 Contextual Compression Rather than returning entire retrieved chunks, extract only the sentences or spans within each chunk that are relevant to the query. This maximises the information density of the context window. LLM Extractor: Prompt the LLM to extract relevant sentences from each chunk. High quality but adds ~100– 200ms latency per chunk. Embeddings Filter: Re-embed each sentence in the chunk, retain only those with cosine similarity > threshold (0.75) to the query embedding. Faster (~10ms) but less nuanced. Pipeline: Contextual compression is typically the last pre-generation step after retrieval and re-ranking. Combining Patterns: High-performing production RAG pipelines commonly stack: (1) Multi-query generation → (2) Hybrid retrieval → (3) Cross-encoder re-ranking → (4) Contextual compression. Each step incrementally improves answer quality at increasing latency cost. Profile before enabling all layers. 6   RAG Pipeline Architecture A production RAG system encompasses two distinct pipelines: an offline indexing pipeline and an online query pipeline. Treating them as separate deployable components enables independent scaling and iteration. 6.1 Offline Indexing Pipeline The indexing pipeline transforms raw documents into searchable vector representations: Document Ingestion: Load from sources (S3, SharePoint, databases, web crawl). Support PDF (PyMuPDF, Unstructured.io), DOCX, HTML, Markdown, CSV. Preprocessing: Normalise encoding (UTF-8), strip boilerplate (headers/footers), extract structured metadata (title, author , date, section). Chunking: Apply strategy from §2. Attach metadata to each chunk (source file, chunk index, page number , section heading).",
+    "token_count": 646,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 7,
+      "chunk_index": 10
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p7_c011",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 7,
+    "chunk_index": 11,
+    "text": "Unstructured.io), DOCX, HTML, Markdown, CSV. Preprocessing: Normalise encoding (UTF-8), strip boilerplate (headers/footers), extract structured metadata (title, author , date, section). Chunking: Apply strategy from §2. Attach metadata to each chunk (source file, chunk index, page number , section heading). Embedding: Batch-encode chunks. Process in batches of 256–512 for API efficiency. Vector Store Upsert: Write vectors + metadata to the vector DB. Use idempotent upsert (hash content as ID) to support incremental re-indexing. 6.2 Online Query Pipeline The query pipeline handles real-time user requests: Query Pre-processing: Safety checks (PII detection, prompt injection guard), language detection, query transformation (§5.1). Embedding: Embed the (transformed) query using the same model as indexing. Target <50ms for embedding API calls. Retrieval: Execute ANN search + optional BM25. Apply metadata filters (see §6.3). Retrieve top-50 to top-100 candidates. Re-ranking: Apply cross-encoder or MMR to produce top-5 to top-10 final chunks. Contextual Compression: Optionally extract relevant sub-spans. Prompt Assembly: Inject retrieved context + conversation history + system prompt into the LLM template. Generation: Call LLM API. Stream tokens to user if latency is critical. Post-processing: Citation extraction, groundedness check, PII redaction in output. 6.3 Metadata Filtering Metadata filters narrow the retrieval scope before ANN search, dramatically improving precision for structured corpora: Filter Type Example Use Case Date range created_at >= 2024-01-01 Recency-sensitive queries • • • • • • • • • 1. 2. 3. 4. 5. 1. 2. 3. 4. 5. 6. 7. 8. RAG Architecture Patterns — Technical Reference Page 7 of 10",
+    "token_count": 431,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 7,
+      "chunk_index": 11
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p8_c012",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 8,
+    "chunk_index": 12,
+    "text": "Filter Type Example Use Case\nSource/domain source = \"legal-contracts\" Domain-specific retrieval\nDocument type doc_type IN [\"policy\", \"faq\"] Content-type filtering\nUser/tenant ID tenant_id = {user.org} Multi-tenant access control\nLanguage lang = \"en\" Multilingual corpora\n6.4 Vector Database Selection\nDatabase Scale Metadata Filtering Hybrid Search Deployment\nPinecone Billions Rich Yes (sparse-dense) Managed cloud\nWeaviate 100M+ GraphQL Yes (BM25+vector) Cloud / self-host\nQdrant 100M+ Payload filters Yes Cloud / self-host\nChroma 1M Basic No Embedded / server\npgvector 10M Full SQL Via extension PostgreSQL\n6.5 Latency Budget\nFor an end-to-end latency target of 3 seconds (P95), a typical budget allocation:\nQuery embedding: 50ms\nANN retrieval (HNSW): 5–15ms\nBM25 retrieval: 10–30ms\nCross-encoder re-ranking (top-50): 80–150ms\nLLM generation (first token, GPT-4o): 500–800ms\nLLM streaming (full response): 1500–2500ms\nPerformance Trap: Enabling contextual compression with an LLM extractor adds 300–600ms per retrieved\nchunk. For a top-5 retrieval set, this can add 1.5–3 seconds — potentially doubling total latency. Use the\nembeddings filter variant (§5.5) in latency-sensitive paths.\n7   Evaluation Metrics and Frameworks\nRAG evaluation is fundamentally a dual problem: evaluating retrieval quality (did we fetch the right chunks?)\nand generation quality (is the answer correct, faithful, and complete?). These require different metrics.\n7.1 Retrieval Metrics\nPrecision@K\nFraction of retrieved chunks that are relevant:\nPrecision@K = |{relevant docs in top-K}| / K\nPenalises noise in the retrieved set. Critical when context window is limited.\nRecall@K\nFraction of all relevant chunks that appear in the top-K:\nRecall@K = |{relevant docs in top-K}| / |{total relevant docs}|\nCritical for completeness — missing a key supporting fact leads to incomplete answers.\nMean Reciprocal Rank (MRR)\nAverage of the reciprocal rank of the first relevant result across queries:\nMRR = (1/|Q|) · Σ_q 1 / rank_q(first relevant)\nStandard benchmark: MRR@10 on MS MARCO. State-of-the-art dense retrieval: MRR@10 ≈ 0.37–0.41.\nNormalised Discounted Cumulative Gain (NDCG)\nConsiders both the relevance of retrieved documents and their rank position, supporting graded relevance\njudgements:\nNDCG@K = DCG@K / IDCG@K where DCG@K = Σᵢ (2^relᵢ - 1) / log₂(i+1)\nNDCG@10 is the primary metric for MS MARCO and BEIR benchmark evaluations. State-of-the-art hybrid retrieval:\nNDCG@10 ≈ 0.72–0.74 on MS MARCO.\n•\n•\n•\n•\n•\n•\nRAG Architecture Patterns — Technical Reference Page 8 of 10",
+    "token_count": 638,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 8,
+      "chunk_index": 12
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p9_c013",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 9,
+    "chunk_index": 13,
+    "text": "7.2 Generation Metrics Faithfulness Measures whether every claim in the generated answer can be attributed to the retrieved context — i.e., the absence of hallucination grounded in retrieved chunks: Faithfulness = |{claims supported by context}| / |{total claims in answer}| Evaluated using an LLM-as-judge that decomposes the answer into atomic claims and verifies each against the source context. High-quality RAG systems target faithfulness > 0.90. Answer Relevance Measures whether the answer addresses the user's question (regardless of factual grounding). Computed by generating synthetic questions from the answer and measuring cosine similarity to the original query. Target: > 0.85. Context Precision & Recall (RAGAS) Context Precision assesses whether retrieved chunks contain the ground-truth answer . Context Recall measures what fraction of ground-truth answer statements can be attributed to the retrieved context. 7.3 RAGAS Framework RAGAS (Retrieval Augmented Generation Assessment) is an open-source evaluation framework that provides reference-free, LLM-based scoring across four metrics: Metric Input Required What It Measures Target Score Faithfulness Q, Answer , Context Claim-level hallucination rate >0.90 Answer Relevance Q, Answer Query-answer alignment >0.85 Context Precision Q, Context, Ground Truth Signal-to-noise in retrieved context >0.80 Context Recall Context, Ground Truth Coverage of ground truth in context >0.85 RAGAS uses GPT-4 or GPT-3.5-turbo as evaluator by default, consuming ~1000–2000 tokens per QA pair . For large test sets, use gpt-3.5-turbo with sampling to reduce evaluation cost by ~10×. 7.4 Evaluation Dataset Construction Synthetic QA generation: Use RAGAS TestsetGenerator to automatically generate question-answer pairs from the corpus. Generates simple, multi-context, and reasoning question types. Human annotation: Gold standard; expensive. Use for final acceptance testing (100–500 QA pairs per domain). Production data: Mine user queries + feedback labels (thumbs up/down) from production logs. Most representative of real usage. 7.5 Retrieval vs. Generation Decomposition A key diagnostic: if faithfulness is high but answer relevance is low, the retrieval is returning irrelevant chunks (retrieval problem). If faithfulness is low but context recall is high, the LLM is generating unsupported claims (generation problem). This decomposition guides where to focus optimisation effort. 8   Common Pitfalls and Best Practices Teams building RAG systems encounter a consistent set of failure patterns. Recognising these early prevents costly architectural rework.",
+    "token_count": 655,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 9,
+      "chunk_index": 13
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p9_c014",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 9,
+    "chunk_index": 14,
+    "text": "(retrieval problem). If faithfulness is low but context recall is high, the LLM is generating unsupported claims (generation problem). This decomposition guides where to focus optimisation effort. 8   Common Pitfalls and Best Practices Teams building RAG systems encounter a consistent set of failure patterns. Recognising these early prevents costly architectural rework. 8.1 Common Pitfalls Pitfall 1: Ignoring Chunk Boundaries Splitting mid-sentence or mid-table destroys semantic coherence. A chunk containing \"...the result was 42.7%\" with no referent context is useless for retrieval. Fix: Always inspect 10–20 sample chunks manually before committing to a chunking strategy. Pitfall 2: Using the Wrong k Retrieving too few chunks (k=3) risks missing supporting evidence for complex queries. Too many (k=20) floods the context window with noise, degrading generation quality. Fix: Start with k=5–8; tune on a held-out evaluation set measuring faithfulness and context precision jointly. Pitfall 3: Embedding Model Mismatch Indexing with one embedding model and querying with another produces incompatible vector spaces. Fix: Record the embedding model name and version in the vector store metadata; enforce version checks at query time. Pitfall 4: Neglecting Metadata Raw embedding search without metadata filters returns topically similar but contextually irrelevant documents (e.g., returning 2019 policy documents for a query about 2024 regulations). Fix: Extract and index date, source, document type, and access-level metadata at ingestion time. • • • RAG Architecture Patterns — Technical Reference Page 9 of 10",
+    "token_count": 405,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 9,
+      "chunk_index": 14
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p10_c015",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 10,
+    "chunk_index": 15,
+    "text": "Pitfall 5: No Evaluation Loop Deploying RAG without automated evaluation means regressions go undetected. Fix: Integrate RAGAS or an equivalent into CI/CD. Run evaluation on every prompt template or chunking strategy change. Pitfall 6: Lost-in-the-Middle Effect Research (Liu et al., 2023) shows LLMs preferentially attend to content at the beginning and end of long context windows, ignoring middle content. Fix: Place the most relevant chunks first and last; apply contextual compression to reduce total context length. 8.2 Best Practices Checklist Category Best Practice Priority Chunking Manually inspect 20+ sample chunks before deployment HIGH Chunking Include chunk overlap (10–15%) to bridge boundary splits HIGH Embeddings Pin embedding model version; re-index on model updates HIGH Retrieval Use hybrid search (dense + BM25) for production systems HIGH Retrieval Apply metadata filters to narrow the search scope HIGH Re-ranking Deploy a cross-encoder re-ranker for precision-critical use cases MED Evaluation Maintain a 200+ QA test set; run RAGAS in CI/CD HIGH Evaluation Decompose failures into retrieval vs. generation problems HIGH Prompting Instruct the LLM to answer only from provided context HIGH Prompting Place most relevant chunks first in the context window MED Operations Log retrieved chunk IDs and scores for every request HIGH Operations Implement incremental re-indexing (hash-based upsert) MED Security Apply tenant-level metadata filters to enforce access control HIGH Security Detect and block prompt injection in user queries HIGH 8.3 Scaling Considerations Index size: HNSW memory usage grows linearly with corpus size. For >10M vectors, switch to IVF-PQ or use disk-based ANN (DiskANN). Throughput: Embedding APIs typically rate-limit at 500–3000 RPM. Implement exponential backoff and request queuing for high-throughput indexing jobs. Cost optimisation: Cache embeddings for repeated queries (Redis TTL cache). Cache LLM responses for identical (query, context) pairs. A 90-day rolling cache can reduce API costs by 30–50% for stable corpora. Corpus maintenance: Stale documents degrade answer quality. Implement document TTL policies and re- indexing triggers on source system updates (webhooks, S3 event notifications). 8.4 Summary: RAG Maturity Model Level Characteristics Typical RAGAS Score L1 — Naive Fixed-size chunks, dense-only, no re-ranking 0.55–0.65 L2 — Structured Sentence/recursive chunking, hybrid search, metadata filters 0.65–0.75 L3 — Advanced Semantic chunking, cross-encoder re-ranking, query transformation 0.75–0.85",
+    "token_count": 643,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 10,
+      "chunk_index": 15
+    }
+  },
+  {
+    "chunk_id": "rag_architecture_patterns_pdf_p10_c016",
+    "document_name": "rag_architecture_patterns.pdf",
+    "page_number": 10,
+    "chunk_index": 16,
+    "text": "indexing triggers on source system updates (webhooks, S3 event notifications). 8.4 Summary: RAG Maturity Model Level Characteristics Typical RAGAS Score L1 — Naive Fixed-size chunks, dense-only, no re-ranking 0.55–0.65 L2 — Structured Sentence/recursive chunking, hybrid search, metadata filters 0.65–0.75 L3 — Advanced Semantic chunking, cross-encoder re-ranking, query transformation 0.75–0.85 L4 — Production Parent-child, contextual compression, automated eval, caching 0.85–0.92 • • • • RAG Architecture Patterns — Technical Reference Page 10 of 10",
+    "token_count": 138,
+    "metadata": {
+      "source": "rag_architecture_patterns.pdf",
+      "page": 10,
+      "chunk_index": 16
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p1_c000",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 1,
+    "chunk_index": 0,
+    "text": "SENIOR AI ENGINEER TECHNICAL ASSESSMENT  ·  SAMPLE DOCUMENT CORPUS\n03Vector Database\nComparisonArchitecture, Benchmarks & Selection Guide\nfor Production AI Systems\nDOCUMENT 3 of 6 — Knowledge\nCorpus\nSCOPE FAISS · Pinecone ·\nWeaviate · pgvector ·\nChroma\nAUDIENCE Senior AI/ML\nEngineers building\nRAG systems\nVERSION 1.0 — Assessment\nCorpus Release\nAssessment Purpose: Part of the standardised\nknowledge corpus. Enables testing of cross-\ndocument retrieval, multi-step reasoning (e.g.,\n“Which vector DB suits a cost-conscious startup\nneeding hybrid search and ACID compliance?”), and\nunanswerable question handling (questions about\nQdrant or Milvus should be gracefully declined—\nthey are not covered here).\nContents\n1 Introduction to Vector Databases 2\nCore Concepts, ANN Algorithms, SQL\nvs Vector DB\n2 FAISS — Facebook AI Similarity Search 2\nIndex Types: Flat, IVF, HNSW, PQ; GPU\nsupport\n3 Pinecone 3\nServerless vs. Pod-Based; Metadata\nFiltering; Pricing\n4 Weaviate 3\nHybrid Search (BM25+Vector); Multi-\nTenancy; Modules\n5 pgvector (PostgreSQL Extension) 3\n6 Chroma 3\n7 Head-to-Head Comparison Matrix 4\n8 Performance Benchmarks 5\n9 Selection Guide & Decision Framework 6\n10 Best Practices 7",
+    "token_count": 297,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 1,
+      "chunk_index": 0
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p2_c001",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 2,
+    "chunk_index": 1,
+    "text": "SECTION 01\nIntroduction to Vector Databases\nA vector database is a specialised data store for indexing and querying high-dimensional vectors—numerical\nrepresentations (embeddings) of unstructured data. Unlike traditional databases that retrieve records by exact key\nlookups, vector databases find the most semantically similar items using approximate nearest neighbour (ANN)\nalgorithms. They are foundational infrastructure for RAG pipelines, recommendation engines, and semantic search.\nANN Algorithms\nHNSW: Graph-based; best recall/speed tradeoff; high\nmemory usage\nIVF: Cluster-based; probes nearest clusters; lower\nmemory\nPQ: Product Quantisation; 4–16× memory reduction;\nsome recall loss\nLSH: Hash-based; fast but lower recall than HNSW\nSimilarity Metrics\nCosine: Angle between vectors — preferred for text\nEuclidean (L2): Straight-line distance — common for\nimages\nDot Product: Efficient unnormalised cosine\nDimension SQL DB Vector DB\nPrimary\nQuery\nExact match,\nrange\nSemantic similarity (k-NN)\nIndex Type B-tree, GIN HNSW, IVF, PQ\nData Type Structured rows Float vectors + metadata\nACID Full Varies (often eventual)\nScale Model Vertical +\nsharding\nPurpose-built horizontal\nUse Case Transactional RAG, search,\nrecommendations\nKEY INSIGHT\nA 5–10% difference in recall@10 translates to a measurable drop in RAG answer faithfulness. Vector DB selection is a\ncritical architectural decision.\n•\n•\n•\n•\n•\n•\n•\nVector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 2 of 7",
+    "token_count": 376,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 2,
+      "chunk_index": 1
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p3_c002",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 3,
+    "chunk_index": 2,
+    "text": "SECTION 02 FAISS — Facebook AI Similarity Search FAISS is an open-source C++ library (Meta AI, 2017) providing ANN primitives. It is a library, not a database—no persistence, network API, or metadata management out of the box. Offers the widest index variety with fine-grained performance control and first-class GPU support (CUDA). Index Recall Speed Memory Best For IndexFlatL2 100% Slow O(n·d) High <100K vectors, ground truth IndexIVFFlat 90–99% Fast Medium 1M–100M, moderate recall IndexHNSWFlat 97–99.5% Very fast (<5 ms) High Production, latency-sensitive IndexIVFPQ 85–95% Very fast Very Low 100M+ vectors, memory-constrained STRENGTHS ✓ Fastest raw performance with GPU acceleration (500K+ QPS on A100) ✓ Widest index variety; battle-tested at Meta scale ✓ MIT licence; no infrastructure cost LIMITATIONS ✗ No built-in persistence, metadata filtering, or network API ✗ No multi-tenancy or access control ✗ Steep learning curve for index parameter tuning Ideal for: Research/ML experimentation; custom vector search infrastructure; GPU-accelerated batch indexing pipelines; serving layer embedded inside a larger application. SECTION 03 Pinecone Pinecone (2021) is a fully managed, cloud-native vector database. All infra is abstracted behind REST/gRPC. Two modes: Serverless (auto-scale, per-request billing, cold starts 50–200 ms) and Pod-based (dedicated HNSW-in-RAM, consistent p99 <15 ms, ~$0.096/hr per s1.x1 pod). Pre-filter metadata: Applied before ANN search. Operators: $eq, $ne, $in, $and, $or . No recall degradation vs post-filter . Namespaces: Logical multi-tenancy within a single index. Hybrid search: Pod-based only; dense + sparse (BM25/SPLADE) via alpha parameter . Compliance: SOC 2 Type II, HIPAA-eligible. Pricing at 1M vectors / 100 QPS: serverless ~$70–$120/mo; pod ~$300–$600/ mo. STRENGTHS ✓ Zero infra overhead; best LangChain/LlamaIndex integration; enterprise SLAs LIMITATIONS ✗ Vendor lock-in; cost scales at >50M vectors; serverless cold starts; hybrid search pod-only SECTION 04 Weaviate Weaviate (Go, BSD 3-Clause, 2019) is open-source with schema-based classes, GraphQL + REST + gRPC APIs, and modular vectorisation. Self-hosted (Docker/K8s) or managed WCS. Default HNSW index with configurable ef , efConstruction , maxConnections . Hybrid search: BM25 + vector , fused via RRF or weighted alpha. Typically improves recall@10 by 4–9% on domain corpora vs pure vector . No external BM25 indexing required. Multi-tenancy: Native per-tenant HNSW graph isolation; hot/warm/cold tenant lifecycle for SaaS memory management.",
+    "token_count": 640,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 3,
+      "chunk_index": 2
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p3_c003",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 3,
+    "chunk_index": 3,
+    "text": "efConstruction , maxConnections . Hybrid search: BM25 + vector , fused via RRF or weighted alpha. Typically improves recall@10 by 4–9% on domain corpora vs pure vector . No external BM25 indexing required. Multi-tenancy: Native per-tenant HNSW graph isolation; hot/warm/cold tenant lifecycle for SaaS memory management. Modules: text2vec-openai , text2vec-cohere , text2vec-huggingface , generative-openai , reranker-cohere . STRENGTHS ✓ Native hybrid search + multi-tenancy + rich module ecosystem; open-source LIMITATIONS ✗ Higher ops complexity; memory-intensive (HNSW graph in RAM); WCS costly at low scale • • • • • • • Vector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 3 of 7",
+    "token_count": 180,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 3,
+      "chunk_index": 3
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p4_c004",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 4,
+    "chunk_index": 4,
+    "text": "SECTION 05\npgvector — PostgreSQL Extension\npgvector (v0.7, 2024) adds a native vector type and ANN operators to PostgreSQL. Operators: <-> (L2), <=> (cosine),\n<#> (dot). Two index types: ivfflat (fast build, 85–95% recall, 10–50 ms/1M) and hnsw (slow build, 96–99% recall, <20\nms/1M). Available on AWS RDS, GCP Cloud SQL, Supabase, Neon.\nSTRENGTHS\n✓ Zero new infra; full ACID; native SQL WHERE\nfiltering; vector + tsvector in single query\nLIMITATIONS\n✗ Degrades beyond ~5M vectors; HNSW build locks\ntable; lower throughput than purpose-built DBs\nSECTION 06\nChroma\nChroma (Apache 2.0, 2022) is a lightweight embedding database for prototyping. Python-native; in-memory\n(ephemeral), persistent (SQLite + hnswlib), or client/server modes. Built-in embedding wrappers for OpenAI, Cohere,\nHuggingFace. Full RAG prototype in <10 lines of Python. Not production-grade at >1M vectors—no replication,\nhybrid search, or horizontal scaling. Ideal for hackathons, notebooks, CI/CD ephemeral tests, and developer\nonboarding.\nSECTION 07\nHead-to-Head Comparison Matrix\nDimension FAISS Pinecone Weaviate pgvector Chroma\nDeployment In-process library Fully managed SaaS Self-hosted or WCS PostgreSQL\nextension\nEmbedded / client-\nserver\nScalability Single node; GPU\nsharding\nAuto (serverless);\nmanual pods\nHorizontal K8s Vertical; ceiling ~5–\n10M\nSingle node; ceiling\n~1M\nLatency p99\n(1M vectors)\n<5 ms (HNSW in-\nmem)\n5–15 ms (pod); 20–\n80 ms (serverless)\n5–20 ms (self-\nhosted)\n10–50 ms (HNSW) 5–30 ms (<500K)\nMetadata Filter None (app-layer) Rich pre-filter ($eq/\n$in/$and)\nGraphQL; pre-filter Full SQL WHERE Basic MongoDB-\nstyle\nHybrid Search No Yes (pod-based) Yes (BM25+vector ,\nRRF)\nPartial (vector +\ntsvector)\nNo\nPricing Free (MIT) Per RU/WU or pod-\nhour\nFree (self-hosted) Postgres compute\nonly\nFree (Apache 2.0)\nPersistence Manual serialisation Managed, durable Disk-backed,\ndurable\nFull WAL-backed Optional (SQLite)\nACID No No (eventual) No (eventual) Yes Partial (SQLite)\nMulti-Tenancy None Namespaces (logical) Native tenant\nisolation\nPostgreSQL RLS Collections (logical)\nGPU Support Yes (CUDA) No (managed) No No No\nProduction\nReady\nMedium (DIY ops) High (SOC2/HIPAA) High High (within scale\nlimits)\nLow (prototyping)\nLicence MIT Proprietary BSD 3-Clause PostgreSQL Licence Apache 2.0\nVector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 4 of 7",
+    "token_count": 594,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 4,
+      "chunk_index": 4
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p5_c005",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 5,
+    "chunk_index": 5,
+    "text": "SECTION 08\nPerformance Benchmarks\nBenchmarks based on ANN-Benchmarks, vendor-published results, and community testing (late 2024). All 1,536-d vectors (OpenAI\ntext-embedding-ada-002 equivalent). Single-node configurations unless noted.\n8.1 Query Latency p99 (ms) by Dataset Size\nSystem 100K 1M 10M 100M\nFAISS HNSW (in-memory) <1 ms 2–5 ms 5–12 ms 12–30 ms\nFAISS IVF-PQ (in-memory) <1 ms 1–3 ms 3–8 ms 5–15 ms\nPinecone (pod, p1.x1) 2–5 ms 5–15 ms 10–25 ms Multi-pod\nPinecone (serverless) 10–30 ms 15–50 ms 20–80 ms 30–120 ms\nWeaviate (HNSW, self-hosted) 2–5 ms 5–20 ms 15–40 ms 30–80 ms\npgvector (HNSW) 3–8 ms 10–50 ms 40–150 ms Not recommended\nChroma (hnswlib, local) 2–10 ms 15–60 ms Not recommended Not recommended\n8.2 Recall@10 and Throughput at 1M Vectors (16 vCPUs)\nSystem & Index Recall@10 p50 Latency QPS (Single) Index Build Time\nFAISS Flat (exact) 100.0% 120–400 ms ~10 N/A\nFAISS HNSW (M=32, ef=64) 98.7% 3 ms 800–1,200 ~12 min\nFAISS IVF-PQ (nlist=256) 91.2% 1.5 ms 3,000–6,000 ~4 min\nFAISS HNSW (GPU, A100) 98.5% <0.1 ms 40,000–80,000 ~45 sec\nPinecone (pod, p1) 97.5% 8 ms ~200/pod Managed\nWeaviate HNSW (ef=100) 97.8% 9 ms 400–800 ~18 min\npgvector HNSW (m=16) 96.1% 22 ms 150–400 ~35 min\npgvector ivfflat (lists=100) 88.5% 35 ms 200–500 ~8 min\nChroma (defaults) 94.3% 18 ms 100–300 ~8 min\nBENCHMARK CAVEAT\nPerformance is highly workload-dependent. Index parameters (ef, nprobe), hardware (RAM, CPU, NVMe), embedding\ndimensionality, and batch vs single-query patterns all materially impact results. Always benchmark on your specific\nworkload.\nVector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 5 of 7",
+    "token_count": 412,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 5,
+      "chunk_index": 5
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p6_c006",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 6,
+    "chunk_index": 6,
+    "text": "SECTION 09\nSelection Guide & Decision Framework\nScenario Recommended Rationale\nStartup MVP / Prototype CHROMA →\npgvector\nFastest setup (<5 min); migrate to pgvector at >200K vectors or add Pinecone\nServerless for managed scale\nEnterprise Production\nRAG\nPINECONE (POD) Consistent p99 <15 ms; SOC2/HIPAA; pre-filtering metadata; minimal ops.\nAlternative: Weaviate K8s if hybrid search or cost at scale is a concern\nExisting PostgreSQL\nShop\nPGVECTOR\nHNSW\nZero new infra; full ACID; native SQL filtering; single-DB architecture eliminates\ndual-write complexity. Use up to ~5M vectors\nResearch / GPU\nExperimentation\nFAISS Maximum index control; GPU acceleration (500K+ QPS on A100); add\npersistence + metadata layer in application code\nMulti-Tenant SaaS AI WEAVIATE Native per-tenant HNSW isolation with hot/warm/cold lifecycle management;\nmore robust than Pinecone namespaces at high tenant counts\nHybrid Search Required WEAVIATE Best native BM25 + vector fusion (RRF); 4–9% recall improvement on domain\ncorpora vs pure vector . Pinecone pod-based as alternative\n9.1 Decision Heuristics\nScale <1M vectors: Any solution works; optimise for developer experience.\nScale 1–5M: pgvector (if on Postgres), Pinecone Serverless, or Weaviate.\nScale >10M: Pinecone pod, distributed Weaviate, or FAISS with IVF-PQ compression.\nLatency SLA <10 ms p99: FAISS (in-process) or Pinecone pod.\nACID required: pgvector only.\nData residency / on-prem: FAISS, self-hosted Weaviate, or pgvector self-hosted.\nBudget <$100/mo: pgvector on existing DB or Chroma for dev.\nMIGRATION PATH\nOptimal progression for most RAG products: Chroma (prototype) → pgvector (early production, <2M docs) → Pinecone\nor Weaviate (scaled production). Avoid premature optimisation—the cost and complexity of purpose-built vector DBs are\nonly justified when pgvector's performance ceiling is actually reached.\n•\n•\n•\n•\n•\n•\n•\nVector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 6 of 7",
+    "token_count": 493,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 6,
+      "chunk_index": 6
+    }
+  },
+  {
+    "chunk_id": "vector_database_comparison_pdf_p7_c007",
+    "document_name": "vector_database_comparison.pdf",
+    "page_number": 7,
+    "chunk_index": 7,
+    "text": "SECTION 10\nBest Practices\n10.1 Index Tuning\nHNSW Parameters\nM (connections): 16–32 typical; higher M improves\nrecall but increases memory. Diminishing returns above\nM=64.\nef_construction: 64–256; set ≥2× your target ef at\nquery time.\nef (query): Start at 50–100; tune via recall@10 on a\nholdout set.\nIVF Parameters\nnlist: sqrt(n) to 4×sqrt(n). For 1M vectors: 1,000–4,000.\nnprobe: Start at nlist/10; increase for higher recall.\nDimensionality\nStorage: 4 bytes × d × n. 1M vectors at 1,536d = ~6 GB\nbefore index overhead.\nOpenAI text-embedding-3-large supports dimension\ntruncation (3,072d → 256d with ~2% recall loss).\n10.2 Ingestion Strategy\nReal-time: Single upsert; <100 vectors/sec; use for user-\nfacing ingestion.\nMicro-batch (100–1K): Async background ingestion;\nbalances freshness and throughput.\nBulk (>10K): Initial corpus load or nightly re-indexing;\nparallelise embedding calls (OpenAI: up to 2,048 inputs/\ncall).\nCache embeddings by content hash to avoid re-\ncomputing unchanged documents.\n10.3 Monitoring & Observability\nKey metrics: query latency (p50/p95/p99), recall@k\n(holdout sampling), index size (GB), ingestion lag, error\nrate.\nPinecone: describe_index_stats() → Prometheus\ncustom exporter; Datadog integration available.\nWeaviate: Native Prometheus metrics at /metrics ;\ncommunity Grafana dashboards.\npgvector: pg_stat_user_indexes ,\npg_stat_statements , EXPLAIN ANALYZE ; monitor\nautovacuum to prevent index bloat.\nFAISS: No built-in monitoring—instrument at\napplication layer; periodically validate recall vs flat index\nground truth.\n10.4 Migration Strategy\nExport embeddings + metadata to Parquet (portable\nformat).\nValidate embedding model compatibility—changing\nmodels requires full re-embedding.\nDual-write to both systems during transition to prevent\ngaps.\nShadow-test retrieval quality by comparing both\nsystems on the same query set.\nBlue/green cutover: Shift read traffic 10% → 50% →\n100% while monitoring p99 and recall.\n10.5 Common Pitfalls\nNot normalising embeddings before cosine search\n(causes incorrect rankings).\nOver-indexing small collections—HNSW overhead not\njustified for <10K vectors.\nIgnoring query-time ef tuning—default ef settings often\nsacrifice recall for latency unnecessarily.\nStoring raw embeddings without metadata—makes\npost-retrieval filtering impossible.\nCommitting secrets or API keys in vector ingestion\nscripts.\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n•\n1.\n2.\n3.\n4.\n5.\n•\n•\n•\n•\n•\nVector Database Comparison | Document 3 of 6 | Senior AI Engineer Technical Assessment Page 7 of 7",
+    "token_count": 632,
+    "metadata": {
+      "source": "vector_database_comparison.pdf",
+      "page": 7,
+      "chunk_index": 7
+    }
+  }
+]

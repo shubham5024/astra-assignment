@@ -1,0 +1,137 @@
+[
+  {
+    "id": "eval_01",
+    "category": "straightforward_factual",
+    "question": "What chunk size and overlap are recommended for dense QA in RAG systems according to the technical reference?",
+    "expected_document": "rag_architecture_patterns.pdf",
+    "expected_workflow": "SIMPLE_RAG",
+    "must_contain": ["256", "512", "overlap"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_02",
+    "category": "straightforward_factual",
+    "question": "Who first formalized the RAG retrieve-then-generate paradigm and in which year?",
+    "expected_document": "rag_architecture_patterns.pdf",
+    "expected_workflow": "SIMPLE_RAG",
+    "must_contain": ["Lewis", "2020", "Facebook"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_03",
+    "category": "straightforward_factual",
+    "question": "What are the four architectural primitives of LangChain mentioned in the frameworks guide?",
+    "expected_document": "agentic_ai_frameworks.pdf",
+    "expected_workflow": "SIMPLE_RAG",
+    "must_contain": ["Chains", "Agents", "Tools", "Memory"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_04",
+    "category": "straightforward_factual",
+    "question": "What are the primary index types supported by FAISS for similarity search?",
+    "expected_document": "vector_database_comparison.pdf",
+    "expected_workflow": "SIMPLE_RAG",
+    "must_contain": ["Flat", "IVF", "HNSW"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_05",
+    "category": "multi_step_comparison",
+    "question": "Compare Pinecone and Chroma across latency, cost model, and persistence architecture for RAG.",
+    "expected_document": "vector_database_comparison.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["Pinecone", "Chroma"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_06",
+    "category": "multi_step_comparison",
+    "question": "Compare LangGraph and AutoGen regarding their state management, graph flow, and multi-agent patterns.",
+    "expected_document": "agentic_ai_frameworks.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["LangGraph", "AutoGen"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_07",
+    "category": "multi_step_comparison",
+    "question": "Compare Weaviate and pgvector for startups needing hybrid vector search and ACID transactions.",
+    "expected_document": "vector_database_comparison.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["pgvector", "Weaviate"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_08",
+    "category": "multi_step_comparison",
+    "question": "What are the differences between fixed-size chunking and sentence-based chunking in RAG pipelines?",
+    "expected_document": "rag_architecture_patterns.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["Fixed-Size", "Sentence"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_09",
+    "category": "complex_synthesis",
+    "question": "How should an enterprise combine vector database retrieval with an agentic loop to reduce latency and hallucination?",
+    "expected_document": "agentic_ai_frameworks.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["retrieval", "agent"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_10",
+    "category": "complex_synthesis",
+    "question": "What evaluation metrics and frameworks are recommended to measure retrieval hit rate and generation faithfulness in RAG?",
+    "expected_document": "rag_architecture_patterns.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["Hit Rate", "Faithfulness"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_11",
+    "category": "complex_synthesis",
+    "question": "What are the key trade-offs between ReAct loops and Plan-and-Execute multi-agent workflows?",
+    "expected_document": "agentic_ai_frameworks.pdf",
+    "expected_workflow": "AGENTIC_WORKFLOW",
+    "must_contain": ["ReAct", "Plan"],
+    "should_refuse": false
+  },
+  {
+    "id": "eval_12",
+    "category": "out_of_corpus_refusal",
+    "question": "What is the traditional recipe and baking time for Italian Margherita pizza?",
+    "expected_document": null,
+    "expected_workflow": "DIRECT_REFUSAL",
+    "must_contain": [],
+    "should_refuse": true
+  },
+  {
+    "id": "eval_13",
+    "category": "out_of_corpus_refusal",
+    "question": "Explain superconducting qubit coherence times and error correction in quantum computing.",
+    "expected_document": null,
+    "expected_workflow": "DIRECT_REFUSAL",
+    "must_contain": [],
+    "should_refuse": true
+  },
+  {
+    "id": "eval_14",
+    "category": "out_of_corpus_refusal",
+    "question": "How do Milvus and Qdrant compare in benchmark performance for billions of vectors?",
+    "expected_document": null,
+    "expected_workflow": "DIRECT_REFUSAL",
+    "must_contain": [],
+    "should_refuse": true
+  },
+  {
+    "id": "eval_15",
+    "category": "out_of_corpus_refusal",
+    "question": "What are the latest clinical drug treatments for hypertension and heart disease?",
+    "expected_document": null,
+    "expected_workflow": "DIRECT_REFUSAL",
+    "must_contain": [],
+    "should_refuse": true
+  }
+]

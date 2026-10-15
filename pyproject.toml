@@ -1,0 +1,37 @@
+[project]
+name = "intelligent-knowledge-assistant"
+version = "0.1.0"
+description = "Production-oriented Intelligent Knowledge Assistant combining RAG and Agentic Workflows"
+authors = [{ name = "Senior AI Engineer Candidate" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "pypdf>=5.1.0",
+    "rank-bm25>=0.2.2",
+    "numpy>=2.0.0",
+    "openai>=1.55.0",
+    "streamlit>=1.40.0",
+    "httpx>=0.28.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.9.0",
+]
+
+[tool.poetry]
+packages = [{ include = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3.0"
+pytest-asyncio = ">=0.24.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
